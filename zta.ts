@@ -18,6 +18,7 @@ stick.on('startup', function () {
 
 const wait = () => {
 	setTimeout(wait, 250)
+	console.log("tick");
 	sensor.send();
 };
 

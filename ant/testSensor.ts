@@ -1,6 +1,7 @@
 import * as Ant from '../ant/ant';
-import * as AntPlus from 'ant-plus';
-import { throws } from 'assert';
+import { Z_BEST_SPEED } from 'zlib';
+import { kStringMaxLength } from 'buffer';
+// import * as AntPlus from 'ant-plus';
 
 export class testSensor extends Ant.AntPlusSensor {
     static DEVICE_TYPE = 124;
@@ -26,13 +27,16 @@ export class testSensor extends Ant.AntPlusSensor {
     private nextCommonPage: number = 80;
 
     public send() {
+        // specification is to send data pages for 64 messages followed by a common page
+        // followed by 64 data messages and another common page
+        // message frequency should be approx 4hz
         if (this.nextPage < 100) {
             if (this.nextPage === 1) {
-                this.write(this.dataPage1(this.messageCount), 'dp1');
+                this.write(this.dataPage1(1.0), 'dp1');
                 this.nextPage = 2;
             }
             else if (this.nextPage === 2) {
-                this.write(this.dataPage2(this.messageCount), 'dp2');
+                // this.write(this.dataPage2(this.messageCount), 'dp2');
                 this.nextPage = 1;
             }
             this.messageCount++;
@@ -57,22 +61,37 @@ export class testSensor extends Ant.AntPlusSensor {
                 } else {
                     this.nextCommonPage = 80;
                 }
-
             }
         }
-     
     }
 
+    private applyMinMax(value: number, max: number, min: number = 0): number {
+        if (value > max) {
+            value = max;
+        } else if (value < min ) {
+            value = min;
+        }
+        return value;
+    }
+
+    // gets the fractional part of a number, and scales it 
+    private getFractional(value: number, scale: number = 256): number {
+        return Math.floor((value - Math.floor(value)) * scale);
+    }
     public dataPage1(speed: number): Buffer {
+        // speed is in metres per second, max 4 bits (15)
+  
+        speed = this.applyMinMax(speed, 15);
+        console.log("speed", speed, "f", this.getFractional(speed,256));
         let payload: number[] = [];
         payload = payload.concat(Ant.Messages.intToLEHexArray(0x01));   // data page number
-        payload = payload.concat(Ant.Messages.intToLEHexArray(0));
-        payload = payload.concat(Ant.Messages.intToLEHexArray(0));
-        payload = payload.concat(Ant.Messages.intToLEHexArray(0));
-        payload = payload.concat(Ant.Messages.intToLEHexArray(17)); // instantaneous speed (lower 4bits) and distance fractional (upper 4 bits)
-        payload = payload.concat(Ant.Messages.intToLEHexArray(12));// instantaneous speed fractional
-        payload = payload.concat(Ant.Messages.intToLEHexArray(this.messageCount));
-        payload = payload.concat(Ant.Messages.intToLEHexArray(0));
+        payload = payload.concat(Ant.Messages.intToLEHexArray(0));      // time fractional (1/200s)
+        payload = payload.concat(Ant.Messages.intToLEHexArray(0));      // time integer (s)
+        payload = payload.concat(Ant.Messages.intToLEHexArray(0));      // distance accumulated (m)
+        payload = payload.concat(Ant.Messages.intToLEHexArray(Math.floor(speed)));  // instantaneous speed (lower 4bits) and distance fractional (upper 4 bits)
+        payload = payload.concat(Ant.Messages.intToLEHexArray(this.getFractional(speed, 256)));     // instantaneous speed fractional (1/256m/s)
+        payload = payload.concat(Ant.Messages.intToLEHexArray(0));      // stride count
+        payload = payload.concat(Ant.Messages.intToLEHexArray(0));      // update latency (1/32s)
         // return Buffer.from(payload);//
         return Ant.Messages.broadcastData(this.channel, payload);
         // return Ant.Messages.buildMessage(payload, Ant.Constants.MESSAGE_CHANNEL_BROADCAST_DATA);
