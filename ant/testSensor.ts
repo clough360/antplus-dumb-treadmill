@@ -74,7 +74,7 @@ export class testSensor extends Ant.AntPlusSensor {
         payload = payload.concat(Ant.Messages.intToLEHexArray(this.messageCount));
         payload = payload.concat(Ant.Messages.intToLEHexArray(0));
         // return Buffer.from(payload);//
-        return Ant.Messages.acknowledgedData(payload);
+        return Ant.Messages.broadcastData(this.channel, payload);
         // return Ant.Messages.buildMessage(payload, Ant.Constants.MESSAGE_CHANNEL_BROADCAST_DATA);
     }
 
@@ -87,8 +87,8 @@ export class testSensor extends Ant.AntPlusSensor {
         payload = payload.concat(Ant.Messages.intToLEHexArray(12));// instantaneous speed fractional
         payload = payload.concat(Ant.Messages.intToLEHexArray(0xFF));
         payload = payload.concat(Ant.Messages.intToLEHexArray(0x1));
-        return Buffer.from(payload);//Ant.Messages.broadcastData(payload);
-        // return Ant.Messages.broadcastData(payload);
+        // return Buffer.from(payload);//Ant.Messages.broadcastData(payload);
+        return Ant.Messages.broadcastData(this.channel,payload);
         // return Ant.Messages.buildMessage(payload, Ant.Constants.MESSAGE_CHANNEL_BROADCAST_DATA);
     }
 
@@ -110,8 +110,8 @@ export class testSensor extends Ant.AntPlusSensor {
         payload = payload.concat(Ant.Messages.intToLEHexArray(0x02));   // mfr id MSB
         payload = payload.concat(Ant.Messages.intToLEHexArray(0x01));   // model LSB
         payload = payload.concat(Ant.Messages.intToLEHexArray(0x00));   // model MSB
-        return Buffer.from(payload);//Ant.Messages.broadcastData(payload);
-        // return Ant.Messages.buildMessage(payload, Ant.Constants.MESSAGE_CHANNEL_BROADCAST_DATA);
+        // return Buffer.from(payload);//Ant.Messages.broadcastData(payload);
+        return Ant.Messages.buildMessage(payload, Ant.Constants.MESSAGE_CHANNEL_BROADCAST_DATA);
     }
 
     public commonPage81(): Buffer {
@@ -127,5 +127,10 @@ export class testSensor extends Ant.AntPlusSensor {
         return Buffer.from(payload);//Ant.Messages.broadcastData(payload);
         // return Ant.Messages.buildMessage(payload, Ant.Constants.MESSAGE_CHANNEL_BROADCAST_DATA);
     }
+
+    protected updateState(deviceId: number, data: Buffer) {
+		// this.state.DeviceID = deviceId;
+		// updateState(this, this.state, this.page, data);
+	}
 
 }
