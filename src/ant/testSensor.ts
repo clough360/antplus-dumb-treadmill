@@ -1,32 +1,58 @@
-import * as Ant from '../ant/ant';
+import * as Ant from './ant';
 import { Z_BEST_SPEED } from 'zlib';
 import { kStringMaxLength } from 'buffer';
 // import * as AntPlus from 'ant-plus';
 
-export class testSensor extends Ant.AntPlusSensor {
-    static DEVICE_TYPE = 124;
-    static CHANNEL_TYPE = 0x10; // master
-    static TRANSMISSION_TYPE = 5; // transmit and receive
+export interface SpeedDistanceStatus {
+    TimeSinceLastComputation?: number;   // seconds since the last speed computation / measurement (seconds, max 255)
+    DistanceTravelled?: number;          // accumlated distance since last measurement (meters, max 255)
+    CurrentSpeedMps?: number;            // current speed (metres per second, max 255)
+    StrideCount: number;                // number of strides (required)
+    UpdateLatency: number;              // number of milliseconds delay since reading and sending
+}
+
+// this is a fitness monitor that transmits information to attached devices
+export class StrideBasedSpeedAndDistanceMonitor extends Ant.AntPlusSensor {
+    static DEVICE_TYPE = 124;       // stride based speed and distance monitor
+    static CHANNEL_TYPE = 0x10;     // master
+    static TRANSMISSION_TYPE = 5;   // transmit and receive
     static DEVICE_NUMBER = 1;
 
     private messageCount: number = 0;
+    private shouldSendData: boolean = false;
+    private static messageFrequency: number = 4;
+    private static commonPageInterval: number = 64;     // number of pages after to which to send a common page
 
     constructor(stick) {
 		super(stick);
 		// this.decodeDataCbk = this.decodeData.bind(this);
+        this.sendLoop();
+        this.on('attached', this.handleSensorAttached)
+    }
+
+
+    protected handleSensorAttached = () => {
+        this.shouldSendData = true;
     }
     
+
     
-	public attach(channel, deviceID) {
-		super.attach(channel, 'transmit', deviceID, testSensor.DEVICE_TYPE, testSensor.TRANSMISSION_TYPE, 255, 8134);
-        // this.state = new StrideSpeedDistanceSensorState(deviceID);
-    
+	public attach(channel: number, deviceID) {
+        super.attach(channel, 'transmit', deviceID, StrideBasedSpeedAndDistanceMonitor.DEVICE_TYPE, StrideBasedSpeedAndDistanceMonitor.TRANSMISSION_TYPE, 255, 8134);
     }
     
     private nextPage: number = 1;
     private nextCommonPage: number = 80;
 
-    public send() {
+    // main loop for sending status information to attached devices
+    private sendLoop() {
+        if (!this.shouldSendData) {
+            this.send();
+        }
+        setTimeout(this.sendLoop, 250)
+    };
+
+    protected send() {
         // specification is to send data pages for 64 messages followed by a common page
         // followed by 64 data messages and another common page
         // message frequency should be approx 4hz

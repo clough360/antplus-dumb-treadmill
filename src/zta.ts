@@ -1,9 +1,9 @@
 import {GarminStick2 } from './ant/ant';
-import { testSensor } from './ant/testSensor';
+import { StrideBasedSpeedAndDistanceMonitor } from './ant/testSensor';
 
 
 var stick = new GarminStick2();
-var sensor = new testSensor(stick);
+var sensor = new StrideBasedSpeedAndDistanceMonitor(stick);
 sensor.on('attached', () => {
 	console.log('sensor attached');
 wait();
@@ -15,19 +15,9 @@ stick.on('startup', function () {
 	sensor.attach(2,2);
 });
 
-
-const wait = () => {
-	setTimeout(wait, 250)
-	console.log("tick");
-	sensor.send();
-};
-
 console.log("Open...");
 if (!stick.open()) {
 	console.log('Stick not found!');
 }
-
-
-
 
 

@@ -1,5 +1,5 @@
-import {GarminStick2 } from './ant/ant';
-import { HeartRateSensor } from './ant/heart-rate-sensors';
+import {GarminStick2 } from './src/ant/ant';
+import { HeartRateSensor } from './src/ant/heart-rate-sensors';
 //import { testSensor } from './ant/testSensor';
 
 // import * as Ant from 'ant-plus';
