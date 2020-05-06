@@ -1,109 +1,51 @@
-import {Gpio} from 'onoff';
+const Gpio = require('pigpio').Gpio;
+
+export type speedUnits = 'mps' | 'mph' | 'kph';
 
 export class TreadmillIntegration {
-	public ldrThreshold = 0;
-	private ldrLastState = 0;
-	private ldr: Gpio;
-	private onReady: () => void;
-	private lastReadingTime: [number,number] = [0,0];
-	
-	public beltLengthM = 0;
-	public lastSpeedReadingMps = 0;		// last speed reading actually measured
-	public currentSpeedMps = 0;			// current speed, possibly calculated
-	public revolutionCount = 0;
 
-	public lastLdrDuration = 0;
+	private targetSpeedMps = 0;
+	private currentSpeedMps = 0;
+	// rate that speed will be ramped up or down
+	private speedChangeRate = 0.1;
 
-	constructor(beltLengthM: number, onReady: () => void) {
-		console.log("starting treadmill integration")
-		this.beltLengthM = beltLengthM;
-		this.onReady = onReady;
+	// speed pwm settings
+	// duty cycle between 0 and 255
+	private speedPwm: any;
+	private pwmFrequency = 20;
+	private speedMpsToDutyCycleFactor = 10;
 
-		this.ldr = new Gpio(4, 'out');
-		this.initialise();
+	constructor() {
+		this.speedPwm = new Gpio(17, {mode: Gpio.OUTPUT});
+		this.speedPwm.pwmFrequency(this.pwmFrequency);
+		this.speedPwm.pwmWrite(0);
+
 	}
 
-	public onPulse: (elapsedTimeS: number, speedMps: number) => void;
-
-	private async sleep(ms: number) {
-		return new Promise(resolve => setTimeout(resolve, ms));
-	}
-
-	private async initialise(): Promise<void> {
-		var totalDelay = 0;
-		for (var i=0; i<10; i++) {
-			totalDelay += await this.measureLdr();
+	// set the speed in metres per second
+	public setSpeed(speed: number, units: speedUnits = 'mps') {
+		switch (units) {
+			case 'mps': this.targetSpeedMps = speed; break;
+			case 'mph': this.targetSpeedMps = speed / 2.23694; break;
+			case 'kph': this.targetSpeedMps = speed / 3.6000059687997; break;
 		}
-		// set the threshold to be mean delay - 10%
-		this.ldrThreshold = (totalDelay / 10) * 0.9;
-
-		console.log('ti', 'LDR threshold: ', this.ldrThreshold);
-
-
-		this.loop();
-
-		this.onReady()
-	}
-
-	private async measureLdr(): Promise<number> {
-		let elapsedIterations = 0;
-		this.ldr.setDirection('out');
-		this.ldr.writeSync(0);
-		// allow the output pin to reach zero
-		await this.sleep(2);
-
-		while(this.ldr.readSync()){}
-			// then measure how long it takes to become high
-			this.ldr.setDirection('in');
-			while (!this.ldr.readSync()) {
-				elapsedIterations++;
-			}
-		this.lastLdrDuration = elapsedIterations;
-		return elapsedIterations;
-	}
-
-	private async isLdrActive():Promise<boolean> {
-		const tldr = await this.measureLdr();
-		return (tldr < this.ldrThreshold);
 	}
 
 	public async loop() {
-		
-		// we calculate the speed every loop, because if it turns out to be slower than the
-		// last read speed, we set the current speed to be the lower value (for the case that the treadmill is 
-		// spinning down, potentially to a stop)
-		// if no reading for a while, speed is zero
-		let speedNow = 0;
-		if (process.hrtime(this.lastReadingTime)[0] > 10) {
-			this.lastSpeedReadingMps = 0;
-			this.lastReadingTime = [0,0];
-			this.currentSpeedMps = 0;
-		} else {
-			speedNow = this.calculateSpeedMps();
-			if (speedNow < this.currentSpeedMps) {
-				this.currentSpeedMps = speedNow;
-			}
-		}
+		const speedDelta = this.targetSpeedMps - this.currentSpeedMps;
 
-		if (await this.isLdrActive()) {
-			// ldr has tripped, record the current speed as the last recorded speed
-			if (this.ldrLastState === 0) {
-				this.ldrLastState = 1;
-				this.lastReadingTime = process.hrtime();
-				this.lastSpeedReadingMps = speedNow;
-				this.currentSpeedMps = speedNow;
-				this.revolutionCount++;
+		// gradually move towards the target speed, unless within tolerance
+		if (speedDelta !== 0) {
+			if (Math.abs(speedDelta) < this.speedChangeRate) {
+				this.currentSpeedMps = this.targetSpeedMps
+			} else if (speedDelta > 0) {
+				this.currentSpeedMps += this.speedChangeRate;
+			} else {
+				this.currentSpeedMps -= this.speedChangeRate;
 			}
-		} else {
-			this.ldrLastState = 0;
+
+			this.speedPwm.setDutyCycle(this.currentSpeedMps * this.speedMpsToDutyCycleFactor);
 		}
 		setTimeout(this.loop.bind(this),10);
-	}
-
-	// calculate the speed in ms-1 based on the last actual reading
-	private calculateSpeedMps(): number {
-		const elapsedTimeHr = process.hrtime(this.lastReadingTime);
-		const elapsedTimeS = elapsedTimeHr[0] + elapsedTimeHr[1] / 1000000000;
-		return this.beltLengthM / elapsedTimeS;
 	}
 }
