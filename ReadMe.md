@@ -7,3 +7,6 @@ sudo apt-get install -y nodejs
 
 ### install libusb
 sudo apt-get install build-essential libudev-dev
+
+### install pigpio
+sudo apt-get install pigpio

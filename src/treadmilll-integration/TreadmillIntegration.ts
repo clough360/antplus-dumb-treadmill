@@ -1,7 +1,7 @@
 import {Gpio} from 'onoff';
 
 export class TreadmillIntegration {
-	private ldrThreshold = 0;;
+	public ldrThreshold = 0;
 	private ldrLastState = 0;
 	private ldr: Gpio;
 	private onReady: () => void;
@@ -11,6 +11,8 @@ export class TreadmillIntegration {
 	public lastSpeedReadingMps = 0;		// last speed reading actually measured
 	public currentSpeedMps = 0;			// current speed, possibly calculated
 	public revolutionCount = 0;
+
+	public lastLdrDuration = 0;
 
 	constructor(beltLengthM: number, onReady: () => void) {
 		console.log("starting treadmill integration")
@@ -32,8 +34,8 @@ export class TreadmillIntegration {
 		for (var i=0; i<10; i++) {
 			totalDelay += await this.measureLdr();
 		}
-		// set the threshold to be mean delay - 20%
-		this.ldrThreshold = (totalDelay / 10) * 0.8;
+		// set the threshold to be mean delay - 10%
+		this.ldrThreshold = (totalDelay / 10) * 0.9;
 
 		console.log('ti', 'LDR threshold: ', this.ldrThreshold);
 
@@ -56,6 +58,7 @@ export class TreadmillIntegration {
 			while (!this.ldr.readSync()) {
 				elapsedIterations++;
 			}
+		this.lastLdrDuration = elapsedIterations;
 		return elapsedIterations;
 	}
 

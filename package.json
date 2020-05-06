@@ -6,6 +6,7 @@
   "dependencies": {
     "ant-plus": "^0.1.24",
     "onoff": "^6.0.0",
+    "pigpio": "^3.2.1",
     "typescript": "^3.8.3"
   },
   "devDependencies": {
