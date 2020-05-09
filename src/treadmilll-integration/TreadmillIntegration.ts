@@ -1,6 +1,9 @@
+import { ISpeedInformation } from "../api/Api";
+import { lookup } from "dns";
+
 const Gpio = require('pigpio').Gpio;
 
-export type speedUnits = 'mps' | 'mph' | 'kph';
+export type SpeedUnits = 'mps' | 'mph' | 'kph';
 
 export class TreadmillIntegration {
 
@@ -20,14 +23,23 @@ export class TreadmillIntegration {
 		this.speedPwm.pwmFrequency(this.pwmFrequency);
 		this.speedPwm.pwmWrite(0);
 
+		this.loop();
 	}
 
 	// set the speed in metres per second
-	public setSpeed(speed: number, units: speedUnits = 'mps') {
+	public setSpeed(speed: number, units: SpeedUnits = 'mps') {
 		switch (units) {
 			case 'mps': this.targetSpeedMps = speed; break;
 			case 'mph': this.targetSpeedMps = speed / 2.23694; break;
 			case 'kph': this.targetSpeedMps = speed / 3.6000059687997; break;
+		}
+	}
+
+	public getSpeed(units: SpeedUnits = 'mps'): ISpeedInformation {
+		switch (units) {
+			case 'mps': return {targetSpeed: this.targetSpeedMps, currentSpeed: this.currentSpeedMps, units: units};
+			case 'mph': return {targetSpeed: this.targetSpeedMps * 2.23694, currentSpeed: this.currentSpeedMps * 2.23694, units: units};
+			case 'kph': return {targetSpeed: this.targetSpeedMps * 3.6000059687997, currentSpeed: this.currentSpeedMps * 3.6000059687997, units: units};
 		}
 	}
 
@@ -44,7 +56,9 @@ export class TreadmillIntegration {
 				this.currentSpeedMps -= this.speedChangeRate;
 			}
 
-			this.speedPwm.setDutyCycle(this.currentSpeedMps * this.speedMpsToDutyCycleFactor);
+			const dc = Math.trunc(this.currentSpeedMps * this.speedMpsToDutyCycleFactor);
+			console.log('setting pwm dc', dc);
+			this.speedPwm.pwmWrite(dc);
 		}
 		setTimeout(this.loop.bind(this),10);
 	}
